@@ -4,6 +4,7 @@ import CoreLocation
 class ParkingListViewController: UIViewController {
     // MARK: - Properties
     private let street: StreetModel
+    private var addParkingManager = AddParkingManager()
     
     private let tableView: UITableView = {
         let table = UITableView()
@@ -86,9 +87,26 @@ class ParkingListViewController: UIViewController {
         setupTableView()
         setupSearchController()
         configureHeaderInfo()
+        setupNavigationItem()
+        addParkingManager.delegate = self
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        addParkingManager.fetchParkingSpot(streetID: street.streetID)
     }
     
     // MARK: - Setup
+    private func setupNavigationItem() {
+        let addButton = UIBarButtonItem(
+            image: UIImage(systemName: "plus"),
+            style: .plain,
+            target: self,
+            action: #selector(addParkingSpotTapped)
+        )
+        navigationItem.rightBarButtonItem = addButton
+    }
+    
     private func setupUI() {
         view.backgroundColor = .systemBackground
         title = "Parking Spots"
@@ -208,6 +226,12 @@ class ParkingListViewController: UIViewController {
         filterParkingSpots()
     }
     
+    @objc private func addParkingSpotTapped() {
+        let addParkingSpotVC = AddParkingSpotViewController(streetID: street.streetID)
+        navigationController?.pushViewController(addParkingSpotVC, animated: true)
+    }
+
+    
     private func filterParkingSpots() {
         var spots = parkingSpots
         
@@ -261,6 +285,73 @@ extension ParkingListViewController: UITableViewDelegate, UITableViewDataSource 
         let detailVC = ParkingDetailViewController(parkingSpot: spot)
         navigationController?.pushViewController(detailVC, animated: true)
     }
+    
+    func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let spot = isSearching || filterControl.selectedSegmentIndex != 0 ?
+            filteredParkingSpots[indexPath.row] : parkingSpots[indexPath.row]
+        
+        // Edit action
+        let editAction = UIContextualAction(style: .normal, title: "Edit") { [weak self] (action, view, completion) in
+            guard let streetID = self?.street.streetID else {
+                print("dont fetch street id")
+                return
+            }
+            let editSpotVC = EditParkingSpotViewController(parkingSpot: spot, streetID: self?.street.streetID ?? 0)
+            editSpotVC.delegate = self
+            self?.navigationController?.pushViewController(editSpotVC, animated: true)
+            completion(true)
+        }
+        editAction.backgroundColor = UIColor.systemBlue
+        
+        // Delete action
+        let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] (action, view, completion) in
+            self?.showDeleteConfirmation(for: spot)
+            completion(true)
+        }
+        
+        return UISwipeActionsConfiguration(actions: [deleteAction, editAction])
+    }
+
+    // Add these helper methods
+    private func showDeleteConfirmation(for spot: ParkingSpotModel) {
+        let alert = UIAlertController(
+            title: "Delete Parking Spot",
+            message: "Are you sure you want to delete spot #\(spot.parkingSpotID)?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.deleteParkingSpot(spot)
+        })
+        
+        present(alert, animated: true)
+    }
+
+    private func deleteParkingSpot(_ spot: ParkingSpotModel) {
+        Task {
+            do {
+                try await SupabaseManager.shared.client
+                    .from("ParkingSpot")
+                    .delete()
+                    .eq("parkingSpotID", value: spot.parkingSpotID)
+                    .execute()
+                
+                // Refresh the parking spots
+                addParkingManager.fetchParkingSpot(streetID: street.streetID)
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.showAlert(title: "Error", message: "Failed to delete parking spot: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
 }
 
 // MARK: - UISearchResultsUpdating
@@ -270,153 +361,18 @@ extension ParkingListViewController: UISearchResultsUpdating {
     }
 }
 
-// MARK: - ParkingSpotCell
-class ParkingSpotCell: UITableViewCell {
-    private let containerView: UIView = {
-        let view = UIView()
-        view.backgroundColor = .white
-        view.layer.cornerRadius = 12
-        view.layer.shadowColor = UIColor.black.cgColor
-        view.layer.shadowOpacity = 0.1
-        view.layer.shadowRadius = 5
-        view.layer.shadowOffset = CGSize(width: 0, height: 2)
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-    
-    private let spotIdLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 18, weight: .bold)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let typeLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 14)
-        label.textColor = .secondaryLabel
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let statusContainer: UIView = {
-        let view = UIView()
-        view.layer.cornerRadius = 8
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-    
-    private let statusLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: style, reuseIdentifier: reuseIdentifier)
-        setupUI()
+extension ParkingListViewController: EditParkingSpotViewControllerDelegate {
+    func didUpdateParkingSpot() {
+        // Refresh the parking spots
+        addParkingManager.fetchParkingSpot(streetID: street.streetID)
     }
-    
-    override func setHighlighted(_ highlighted: Bool, animated: Bool) {
-        super.setHighlighted(highlighted, animated: animated)
-        
-        if animated {
-            UIView.animate(withDuration: 0.1) {
-                self.containerView.transform = highlighted ? CGAffineTransform(scaleX: 0.98, y: 0.98) : .identity
-                self.containerView.backgroundColor = highlighted ? .systemGray6 : .white
-            }
-        } else {
-            containerView.transform = highlighted ? CGAffineTransform(scaleX: 0.98, y: 0.98) : .identity
-            containerView.backgroundColor = highlighted ? .systemGray6 : .white
-        }
-    }
+}
 
-    override func setSelected(_ selected: Bool, animated: Bool) {
-        super.setSelected(selected, animated: animated)
-        
-        if animated {
-            UIView.animate(withDuration: 0.1) {
-                self.containerView.transform = selected ? CGAffineTransform(scaleX: 0.98, y: 0.98) : .identity
-                self.containerView.backgroundColor = selected ? .systemGray6 : .white
-            }
-        } else {
-            containerView.transform = selected ? CGAffineTransform(scaleX: 0.98, y: 0.98) : .identity
-            containerView.backgroundColor = selected ? .systemGray6 : .white
+extension ParkingListViewController: AddParkingManagerDelegate {
+    func didFetchParkingSpotData(_ parkingSpotModels: [ParkingSpotModel]){
+        parkingSpots = parkingSpotModels
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
         }
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    private func setupUI() {
-        backgroundColor = .clear
-        selectionStyle = .none
-        
-        contentView.addSubview(containerView)
-        containerView.addSubview(spotIdLabel)
-        containerView.addSubview(typeLabel)
-        containerView.addSubview(statusContainer)
-        statusContainer.addSubview(statusLabel)
-        
-        NSLayoutConstraint.activate([
-            containerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-            containerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
-            
-            spotIdLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 16),
-            spotIdLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            
-            typeLabel.topAnchor.constraint(equalTo: spotIdLabel.bottomAnchor, constant: 4),
-            typeLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            
-            statusContainer.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            statusContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
-            statusContainer.heightAnchor.constraint(equalToConstant: 28),
-            
-            statusLabel.topAnchor.constraint(equalTo: statusContainer.topAnchor, constant: 6),
-            statusLabel.bottomAnchor.constraint(equalTo: statusContainer.bottomAnchor, constant: -6),
-            statusLabel.leadingAnchor.constraint(equalTo: statusContainer.leadingAnchor, constant: 12),
-            statusLabel.trailingAnchor.constraint(equalTo: statusContainer.trailingAnchor, constant: -12)
-        ])
-    }
-    
-    func configure(with spot: ParkingSpotModel) {
-        spotIdLabel.text = "Spot #\(spot.parkingSpotID)"
-        typeLabel.text = "Type: \(spot.type.capitalized)"
-        
-        statusLabel.text = spot.isAvailable ? "AVAILABLE" : "OCCUPIED"
-        
-        // Configure status style based on availability
-        if spot.isAvailable {
-            statusContainer.backgroundColor = .systemGreen.withAlphaComponent(0.1)
-            statusLabel.textColor = .systemGreen
-        } else {
-            statusContainer.backgroundColor = .systemRed.withAlphaComponent(0.1)
-            statusLabel.textColor = .systemRed
-        }
-        
-        // Configure container style based on type
-        switch spot.type.lowercased() {
-        case "green":
-            containerView.layer.borderColor = UIColor.systemGreen.cgColor
-            typeLabel.textColor = .systemGreen
-        case "yellow":
-            containerView.layer.borderColor = UIColor.systemYellow.cgColor
-            typeLabel.textColor = .systemYellow
-        case "red":
-            containerView.layer.borderColor = UIColor.systemRed.cgColor
-            typeLabel.textColor = .systemRed
-        case "disable":
-            containerView.layer.borderColor = UIColor.systemBlue.cgColor
-            typeLabel.textColor = .systemBlue
-        default:
-            containerView.layer.borderColor = UIColor.clear.cgColor
-            typeLabel.textColor = .secondaryLabel
-        }
-        containerView.layer.borderWidth = 1
     }
 }

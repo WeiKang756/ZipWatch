@@ -1,3 +1,12 @@
+//
+//  CompoundModel.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 18/01/2025.
+//
+
+import Foundation
+
 struct CompoundModel: Codable {
     let id: UUID
     let plateNumber: String
@@ -12,6 +21,6 @@ struct CompoundModel: Codable {
         case status
         case location
         case createdAt = "created_at"
-        case violation = "Violations"
+        case violation = "violations"
     }
 }

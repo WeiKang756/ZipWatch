@@ -9,33 +9,6 @@
 import UIKit
 import Supabase
 
-// MARK: - Compound Model
-struct CompoundModel: Codable {
-    let id: UUID
-    let plateNumber: String
-    let status: String
-    let location: String 
-    let createdAt: Date
-    let violation: ViolationModel
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case plateNumber = "plate_number"
-        case status
-        case location
-        case createdAt = "created_at"
-        case violation = "Violations"
-    }
-}
-
-struct ViolationModel: Codable {
-    let violationCode: String
-    
-    enum CodingKeys: String, CodingKey {
-        case violationCode = "violation_code"
-    }
-}
-
 // MARK: - CompoundListViewController
 class CompoundListViewController: UIViewController {
     // MARK: - Properties
@@ -48,8 +21,8 @@ class CompoundListViewController: UIViewController {
     }()
     
     private let searchController = UISearchController(searchResultsController: nil)
-    private var compounds: [CompoundModel] = []
-    private var filteredCompounds: [CompoundModel] = []
+    private var compounds: [CompoundData] = []
+    private var filteredCompounds: [CompoundData] = []
     private let supabase = SupabaseManager.shared.client
     
     private var isSearching: Bool {
@@ -103,12 +76,12 @@ class CompoundListViewController: UIViewController {
     private func fetchCompounds() {
         Task {
             do {
-                let compoundData: [CompoundModel] = try await supabase
+                let compoundData: [CompoundData] = try await supabase
                     .from("compounds")
                     .select("""
                         *,
-                        Violations (
-                            violation_code
+                        violations!inner(
+                            *
                         )
                     """)
                     .order("created_at", ascending: false)
@@ -135,6 +108,25 @@ class CompoundListViewController: UIViewController {
 
 // MARK: - UITableViewDelegate & DataSource
 extension CompoundListViewController: UITableViewDelegate, UITableViewDataSource {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let compound = isSearching ? filteredCompounds[indexPath.row] : compounds[indexPath.row]
+        
+        // Convert CompoundModel to CompoundData
+        let compoundData = CompoundData(
+            id: compound.id,
+            violation: compound.violation,
+            location: compound.location,
+            status: compound.status,
+            paymentDate: compound.paymentDate,
+            amountPaid: compound.amountPaid,
+            createdAt: compound.createdAt,
+            plateNumber: compound.plateNumber
+        )
+        
+        let detailVC = CompoundDetailViewController(compound: compoundData)
+        navigationController?.pushViewController(detailVC, animated: true)
+    }
+    
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return isSearching ? filteredCompounds.count : compounds.count
     }
@@ -270,7 +262,7 @@ class CompoundCell: UITableViewCell {
         ])
     }
     
-    func configure(with compound: CompoundModel) {
+    func configure(with compound: CompoundData) {
         plateNumberLabel.text = compound.plateNumber
         violationCodeLabel.text = "Violation: \(compound.violation.violationCode)"
         locationLabel.text = compound.location
@@ -284,13 +276,10 @@ class CompoundCell: UITableViewCell {
         
         // Configure status colors
         switch compound.status.lowercased() {
-        case "pending":
-            statusContainer.backgroundColor = .systemOrange.withAlphaComponent(0.2)
-            statusLabel.textColor = .systemOrange
         case "paid":
             statusContainer.backgroundColor = .systemGreen.withAlphaComponent(0.2)
             statusLabel.textColor = .systemGreen
-        case "overdue":
+        case "unpaid":
             statusContainer.backgroundColor = .systemRed.withAlphaComponent(0.2)
             statusLabel.textColor = .systemRed
         default:

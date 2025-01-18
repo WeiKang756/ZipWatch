@@ -1,3 +1,11 @@
+//
+//  ViolationData.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import Foundation
+
 struct ViolationData: Codable {
     let id: UUID
     let violationCode: String

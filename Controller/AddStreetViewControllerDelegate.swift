@@ -2,15 +2,10 @@ import UIKit
 import CoreLocation
 import Supabase
 
-protocol AddStreetViewControllerDelegate: AnyObject {
-    func didAddStreet()
-}
-
 class AddStreetViewController: UIViewController {
     // MARK: - Properties
-    private let supabase = SupabaseManager.shared.client
-    weak var delegate: AddStreetViewControllerDelegate?
     private let areaID: Int
+    private var parkingManager = AddParkingManager()
     
     // MARK: - UI Components
     private let scrollView: UIScrollView = {
@@ -64,8 +59,6 @@ class AddStreetViewController: UIViewController {
     }()
     
     private let streetNameField = FormFieldView(title: "STREET NAME", placeholder: "Enter street name")
-    private let latitudeField = FormFieldView(title: "LATITUDE", placeholder: "Enter latitude")
-    private let longitudeField = FormFieldView(title: "LONGITUDE", placeholder: "Enter longitude")
     
     private let addButton: UIButton = {
         let button = UIButton(type: .system)
@@ -94,6 +87,7 @@ class AddStreetViewController: UIViewController {
         setupUI()
         setupActions()
         setupKeyboardHandling()
+        parkingManager.delegate = self
     }
     
     // MARK: - Setup
@@ -109,8 +103,6 @@ class AddStreetViewController: UIViewController {
         
         contentView.addSubview(formCard)
         formCard.addSubview(streetNameField)
-        formCard.addSubview(latitudeField)
-        formCard.addSubview(longitudeField)
         formCard.addSubview(addButton)
         
         NSLayoutConstraint.activate([
@@ -145,15 +137,7 @@ class AddStreetViewController: UIViewController {
             streetNameField.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
             streetNameField.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
             
-            latitudeField.topAnchor.constraint(equalTo: streetNameField.bottomAnchor, constant: 20),
-            latitudeField.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
-            latitudeField.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
-            
-            longitudeField.topAnchor.constraint(equalTo: latitudeField.bottomAnchor, constant: 20),
-            longitudeField.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
-            longitudeField.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
-            
-            addButton.topAnchor.constraint(equalTo: longitudeField.bottomAnchor, constant: 30),
+            addButton.topAnchor.constraint(equalTo: streetNameField.bottomAnchor, constant: 30),
             addButton.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
             addButton.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
             addButton.heightAnchor.constraint(equalToConstant: 50),
@@ -186,37 +170,10 @@ class AddStreetViewController: UIViewController {
     @objc private func addButtonTapped() {
         guard validateFields() else { return }
         
-        guard let streetName = streetNameField.textField.text,
-              let latitudeText = latitudeField.textField.text,
-              let longitudeText = longitudeField.textField.text,
-              let latitude = Double(latitudeText),
-              let longitude = Double(longitudeText) else {
-            showAlert(title: "Error", message: "Please enter valid coordinates")
-            return
-        }
+        guard let streetName = streetNameField.textField.text else { return }
         
-        Task {
-            do {
-                try await supabase
-                    .from("Street")
-                    .insert([
-                        "streetName": streetName,
-                        "areaID": areaID,
-                        "latitude": latitude,
-                        "longitude": longitude
-                    ])
-                    .execute()
-                
-                DispatchQueue.main.async { [weak self] in
-                    self?.delegate?.didAddStreet()
-                    self?.showSuccessAlert()
-                }
-            } catch {
-                DispatchQueue.main.async { [weak self] in
-                    self?.showAlert(title: "Error", message: error.localizedDescription)
-                }
-            }
-        }
+        let street = StreetInsertData(streetName: streetName, areaID: areaID)
+        parkingManager.addStreet(street: street)
     }
     
     @objc private func dismissKeyboard() {
@@ -238,25 +195,11 @@ class AddStreetViewController: UIViewController {
     
     // MARK: - Helpers
     private func validateFields() -> Bool {
-        var isValid = true
-        
-        if streetNameField.textField.text?.isEmpty ?? true {
-            streetNameField.showError(true)
-            isValid = false
-        }
-        
-        if latitudeField.textField.text?.isEmpty ?? true {
-            latitudeField.showError(true)
-            isValid = false
-        }
-        
-        if longitudeField.textField.text?.isEmpty ?? true {
-            longitudeField.showError(true)
-            isValid = false
-        }
+        let isValid = !(streetNameField.textField.text?.isEmpty ?? true)
         
         if !isValid {
-            showAlert(title: "Error", message: "Please fill in all fields")
+            streetNameField.showError(true)
+            showAlert(title: "Error", message: "Please enter a street name")
         }
         
         return isValid
@@ -279,6 +222,16 @@ class AddStreetViewController: UIViewController {
         })
         present(alert, animated: true)
     }
+    
+    private func showErrorAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Error",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
 }
 
 // MARK: - UITextFieldDelegate
@@ -286,15 +239,25 @@ extension AddStreetViewController: UITextFieldDelegate {
     func textFieldDidBeginEditing(_ textField: UITextField) {
         if textField == streetNameField.textField {
             streetNameField.hideError()
-        } else if textField == latitudeField.textField {
-            latitudeField.hideError()
-        } else if textField == longitudeField.textField {
-            longitudeField.hideError()
         }
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
         return true
+    }
+}
+
+extension AddStreetViewController: AddParkingManagerDelegate{
+    func didAddStreet() {
+        DispatchQueue.main.async {
+            self.showSuccessAlert()
+        }
+    }
+    
+    func didFailAddStreet() {
+        DispatchQueue.main.async {
+            self.showErrorAlert(message: "Fail to add Street")
+        }
     }
 }

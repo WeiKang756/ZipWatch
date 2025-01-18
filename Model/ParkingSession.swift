@@ -1,3 +1,11 @@
+//
+//  ParkingSession.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 14/01/2025.
+//
+
+
 import Foundation
 
 struct ParkingSession: Decodable {

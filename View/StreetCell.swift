@@ -1,3 +1,11 @@
+//
+//  StreetCell.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import UIKit
+
 // MARK: - StreetCell
 class StreetCell: UITableViewCell {
     private let containerView: UIView = {

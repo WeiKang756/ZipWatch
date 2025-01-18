@@ -7,6 +7,33 @@ protocol ActiveSessionsViewControllerDelegate: AnyObject {
 
 class ActiveSessionsViewController: UIViewController {
     // MARK: - Properties
+    private var selectedArea: String? {
+        didSet {
+            filterSessions()
+        }
+    }
+    
+    private let createCompoundButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.backgroundColor = .systemRed
+        button.setImage(UIImage(systemName: "plus")?.withRenderingMode(.alwaysTemplate), for: .normal)
+        button.tintColor = .white
+        button.layer.cornerRadius = 28
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        button.layer.shadowOpacity = 0.15
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    private let filterButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "line.3.horizontal.decrease.circle"), for: .normal)
+        button.tintColor = .systemBlue
+        return button
+    }()
+    
     private let tableView: UITableView = {
         let table = UITableView()
         table.backgroundColor = .systemBackground
@@ -52,7 +79,80 @@ class ActiveSessionsViewController: UIViewController {
         setupUI()
         setupTableView()
         setupSearchController()
+        setupFilterButton()
         fetchActiveSessions()
+        setupActions()
+    }
+    
+    private func setupFilterButton() {
+        let barButton = UIBarButtonItem(customView: filterButton)
+        navigationItem.rightBarButtonItem = barButton
+        filterButton.addTarget(self, action: #selector(filterButtonTapped), for: .touchUpInside)
+    }
+    
+    @objc private func filterButtonTapped() {
+        Task {
+            do {
+                let areas: [AreaModel] = try await fetchAreas()
+                
+                DispatchQueue.main.async { [weak self] in
+                    self?.showAreaFilterMenu(areas)
+                }
+            } catch {
+                print("Error fetching areas: \(error)")
+            }
+        }
+    }
+    
+    private func fetchAreas() async throws -> [AreaModel] {
+        let areasData: [AreaData] = try await supabase
+            .from("Area")
+            .select()
+            .execute()
+            .value
+        
+        return areasData.map { areaData in
+            AreaModel(
+                areaID: areaData.areaID,
+                areaName: areaData.areaName,
+                latitude: areaData.latitude,
+                longtitude: areaData.longitude,
+                totalParking: areaData.totalParking ?? 0,
+                availableParking: areaData.availableParking ?? 0,
+                numGreen: 0,
+                numYellow: 0,
+                numRed: 0,
+                numDisable: 0,
+                distance: nil
+            )
+        }
+    }
+    
+    private func showAreaFilterMenu(_ areas: [AreaModel]) {
+        let alertController = UIAlertController(title: "Filter by Area", message: nil, preferredStyle: .actionSheet)
+        
+        // Add "All Areas" option
+        alertController.addAction(UIAlertAction(title: "All Areas", style: .default) { [weak self] _ in
+            self?.selectedArea = nil
+        })
+        
+        // Add each area as an option
+        for area in areas {
+            alertController.addAction(UIAlertAction(title: area.areaName, style: .default) { [weak self] _ in
+                self?.selectedArea = area.areaName
+            })
+        }
+        
+        // Add cancel option
+        alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        // For iPad support
+        if let popoverController = alertController.popoverPresentationController {
+            popoverController.sourceView = filterButton
+            popoverController.sourceRect = filterButton.bounds
+        }
+        
+        present(alertController, animated: true)
     }
     
     // MARK: - Setup
@@ -64,6 +164,7 @@ class ActiveSessionsViewController: UIViewController {
         view.addSubview(tableView)
         view.addSubview(loadingIndicator)
         view.addSubview(emptyStateLabel)
+        view.addSubview(createCompoundButton)
         
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -75,7 +176,12 @@ class ActiveSessionsViewController: UIViewController {
             loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             
             emptyStateLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            emptyStateLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            emptyStateLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            
+            createCompoundButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+            createCompoundButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            createCompoundButton.widthAnchor.constraint(equalToConstant: 56),
+            createCompoundButton.heightAnchor.constraint(equalToConstant: 56)
         ])
     }
     
@@ -137,11 +243,34 @@ class ActiveSessionsViewController: UIViewController {
         }
     }
     
-    private func filterContentForSearchText(_ searchText: String) {
-        filteredSessions = activeSessions.filter { session in
-            return session.plateNumber.lowercased().contains(searchText.lowercased())
+    private func filterSessions() {
+        var filteredResults = activeSessions
+        
+        // Apply area filter if selected
+        if let selectedArea = selectedArea {
+            filteredResults = filteredResults.filter { session in
+                return session.parkingSpot.street.area.areaName == selectedArea
+            }
         }
-        tableView.reloadData()
+        
+        // Apply search text filter if searching
+        if isSearching {
+            let searchText = searchController.searchBar.text ?? ""
+            filteredResults = filteredResults.filter { session in
+                return session.plateNumber.lowercased().contains(searchText.lowercased())
+            }
+        }
+        
+        filteredSessions = filteredResults
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.tableView.reloadData()
+            self?.emptyStateLabel.isHidden = !filteredResults.isEmpty
+        }
+    }
+    
+    private func filterContentForSearchText(_ searchText: String) {
+        filterSessions()
     }
     
     private func showAlert(title: String, message: String) {
@@ -149,25 +278,45 @@ class ActiveSessionsViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
+    
+    private func setupActions() {
+        createCompoundButton.addTarget(self, action: #selector(createCompoundTapped), for: .touchUpInside)
+    }
+
+    @objc private func createCompoundTapped() {
+        print("plus tapped")
+        let createCompoundVC = AddCompoundViewController()
+        let navigationController = UINavigationController(rootViewController: createCompoundVC)
+        present(navigationController, animated: true)
+    }
 }
 
 // MARK: - UITableViewDelegate & DataSource
 extension ActiveSessionsViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        let count = isSearching ? filteredSessions.count : activeSessions.count
-        emptyStateLabel.isHidden = count > 0
-        return count
+        let sessions = (isSearching || selectedArea != nil) ? filteredSessions : activeSessions
+        emptyStateLabel.isHidden = sessions.count > 0
+        return sessions.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ActiveSessionCell", for: indexPath) as! ActiveSessionCell
-        let session = isSearching ? filteredSessions[indexPath.row] : activeSessions[indexPath.row]
+        let sessions = (isSearching || selectedArea != nil) ? filteredSessions : activeSessions
+        let session = sessions[indexPath.row]
         cell.configure(with: session)
         return cell
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 140
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let sessions = (isSearching || selectedArea != nil) ? filteredSessions : activeSessions
+        let session = sessions[indexPath.row]
+        
+        let detailVC = SessionDetailViewController(session: session)
+        navigationController?.pushViewController(detailVC, animated: true)
     }
 }
 

@@ -92,6 +92,8 @@ class LoginViewController: UIViewController {
         setupUI()
         setupDelegates()
         setupActions()
+        emailField.textField.text = "yiming@zippark.com"
+        passwordField.textField.text = "12122112"
     }
 
     // MARK: - Setup
@@ -235,13 +237,28 @@ extension LoginViewController: UITextFieldDelegate {
 }
 
 extension LoginViewController: LoginManagerDelegate {
-    func didSignIn(_ result: Bool, _ description: String) {
+    func didSignIn(_ result: Bool, _ description: String, _ role: String? = nil) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
             if result {
                 // Success handling
-                let navigationController = UINavigationController(rootViewController: OfficialHomeViewController())
+                let homeViewController: UIViewController
+                
+                // Determine which home screen to show based on role
+                switch role?.lowercased() {
+                case "city_official":
+                    homeViewController = OfficialHomeViewController()
+                case "enforcement_official":
+                    homeViewController = EnforcementHomeViewController()
+                default:
+                    // Handle unknown role
+                    self.errorLabel.text = "Invalid user role"
+                    self.errorLabel.isHidden = false
+                    return
+                }
+                
+                let navigationController = UINavigationController(rootViewController: homeViewController)
                 
                 if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                    let window = windowScene.windows.first {

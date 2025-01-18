@@ -1,7 +1,14 @@
+//
+//  AddViolationViewController.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import UIKit
+
 class AddViolationViewController: UIViewController {
     // MARK: - Properties
     private let supabase = SupabaseManager.shared.client
-    weak var delegate: ViolationListViewControllerDelegate?
     
     // MARK: - UI Components
     private let scrollView: UIScrollView = {
@@ -206,23 +213,39 @@ class AddViolationViewController: UIViewController {
     @objc private func addButtonTapped() {
         guard validateFields() else { return }
         
+        guard let violationCode = codeField.textField.text,
+              let section = sectionField.textField.text,
+              let description = descriptionTextView.text,
+              let baseAmountText = baseAmountField.textField.text,
+              let amount7DaysText = amount7DaysField.textField.text,
+              let amount30DaysText = amount30DaysField.textField.text,
+              let amount60DaysText = amount60DaysField.textField.text,
+              let baseAmount = Double(baseAmountText),
+              let amount7Days = Double(amount7DaysText),
+              let amount30Days = Double(amount30DaysText),
+              let amount60Days = Double(amount60DaysText) else {
+            showAlert(title: "Error", message: "Please enter valid values")
+            return
+        }
+        
+        let violation = ViolationRequest(
+            violationCode: violationCode,
+            section: section,
+            description: description,
+            baseAmount: baseAmount,
+            amount7Days: amount7Days,
+            amount30Days: amount30Days,
+            amount60Days: amount60Days
+        )
+        
         Task {
             do {
                 try await supabase
                     .from("violations")
-                    .insert([
-                        "violation_code": codeField.textField.text!,
-                        "section": sectionField.textField.text!,
-                        "description": descriptionTextView.text!,
-                        "base_amount": Double(baseAmountField.textField.text!) ?? 0,
-                        "amount_7_days": Double(amount7DaysField.textField.text!) ?? 0,
-                        "amount_30_days": Double(amount30DaysField.textField.text!) ?? 0,
-                        "amount_60_days": Double(amount60DaysField.textField.text!) ?? 0
-                    ])
+                    .insert(violation)
                     .execute()
                 
                 DispatchQueue.main.async { [weak self] in
-                    self?.delegate?.didUpdateViolations()
                     self?.showSuccessAlert()
                 }
             } catch {
@@ -232,7 +255,6 @@ class AddViolationViewController: UIViewController {
             }
         }
     }
-    
     @objc private func dismissKeyboard() {
         view.endEditing(true)
     }
@@ -288,3 +310,38 @@ class AddViolationViewController: UIViewController {
                 isValid = false
             }
         }
+        
+        if !isValid {
+            showAlert(title: "Error", message: "Please fill in all fields correctly")
+        }
+        
+        return isValid
+    }
+    
+    // MARK: - Helper Methods
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showSuccessAlert() {
+        let alert = UIAlertController(
+            title: "Success",
+            message: "Violation added successfully",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        })
+        present(alert, animated: true)
+    }
+}
+
+// MARK: - UITextFieldDelegate
+extension AddViolationViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
+}

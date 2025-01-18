@@ -11,12 +11,12 @@ struct OfficialAccount: Codable {
     let id: UUID
     let name: String
     let officialId: String
-    let role: String
+    let type: String
     
     enum CodingKeys: String, CodingKey {
         case id
         case name
         case officialId = "official_id"
-        case role
+        case type
     }
 }

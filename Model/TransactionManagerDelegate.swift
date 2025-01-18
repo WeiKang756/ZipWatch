@@ -1,3 +1,11 @@
+//
+//  TransactionManagerDelegate.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 14/01/2025.
+//
+import Supabase
+
 protocol TransactionManagerDelegate: AnyObject {
     func didFetchTransactions(_ transactions: [TransactionListData])
     func didFailWithError(_ error: Error)

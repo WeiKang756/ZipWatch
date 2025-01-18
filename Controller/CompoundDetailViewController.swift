@@ -1,3 +1,9 @@
+//
+//  CompoundDetailViewController.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 18/01/2025.
+//
 import UIKit
 
 class CompoundDetailViewController: UIViewController {
@@ -160,9 +166,7 @@ class CompoundDetailViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        configureWithCompound()
-        fetchViolationDetails()
-    }
+        configureWithCompound()    }
     
     // MARK: - Setup
     private func setupUI() {
@@ -287,45 +291,23 @@ class CompoundDetailViewController: UIViewController {
         } else {
             paymentInfoView.isHidden = true
         }
+        
+        configureViolationDetails(with: compound.violation)
     }
     
     private func configureStatus() {
         compoundStatusLabel.text = compound.status.uppercased()
         
         switch compound.status.lowercased() {
-        case "pending":
-            compoundStatusContainer.backgroundColor = .systemOrange.withAlphaComponent(0.2)
-            compoundStatusLabel.textColor = .systemOrange
         case "paid":
             compoundStatusContainer.backgroundColor = .systemGreen.withAlphaComponent(0.2)
             compoundStatusLabel.textColor = .systemGreen
-        case "overdue":
+        case "unpaid":
             compoundStatusContainer.backgroundColor = .systemRed.withAlphaComponent(0.2)
             compoundStatusLabel.textColor = .systemRed
         default:
             compoundStatusContainer.backgroundColor = .systemGray.withAlphaComponent(0.2)
             compoundStatusLabel.textColor = .systemGray
-        }
-    }
-    
-    private func fetchViolationDetails() {
-        Task {
-            do {
-                let violation: ViolationData = try await supabase
-                    .from("violations")
-                    .select()
-                    .eq("id", value: compound.violationId)
-                    .single()
-                    .execute()
-                    .value
-                
-                DispatchQueue.main.async { [weak self] in
-                    self?.configureViolationDetails(with: violation)
-                }
-            } catch {
-                print("Error fetching violation details:", error)
-                showAlert(message: "Failed to fetch violation details")
-            }
         }
     }
     
@@ -387,3 +369,4 @@ class CompoundDetailViewController: UIViewController {
         present(alert, animated: true)
     }
 }
+

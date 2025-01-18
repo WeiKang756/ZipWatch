@@ -1,3 +1,13 @@
+//
+//  TransactionListData.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 14/01/2025.
+//
+
+import Foundation
+
+
 struct TransactionListData: Codable {
     let id: UUID
     let walletId: UUID 

@@ -1,3 +1,11 @@
+//
+//  EditParkingSpotViewControllerDelegate.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import UIKit
+
 protocol EditParkingSpotViewControllerDelegate: AnyObject {
     func didUpdateParkingSpot()
 }
@@ -5,6 +13,7 @@ protocol EditParkingSpotViewControllerDelegate: AnyObject {
 class EditParkingSpotViewController: UIViewController {
     // MARK: - Properties
     private let parkingSpot: ParkingSpotModel
+    private let streetID: Int
     private let supabase = SupabaseManager.shared.client
     weak var delegate: EditParkingSpotViewControllerDelegate?
     private var activeTextField: UITextField?
@@ -55,9 +64,14 @@ class EditParkingSpotViewController: UIViewController {
         return button
     }()
     
+    // Add these new UI components after your existing properties
+    private let latitudeField = FormFieldView(title: "LATITUDE", placeholder: "Enter latitude")
+    private let longitudeField = FormFieldView(title: "LONGITUDE", placeholder: "Enter longitude")
+    
     // MARK: - Initialization
-    init(parkingSpot: ParkingSpotModel) {
+    init(parkingSpot: ParkingSpotModel, streetID: Int) {
         self.parkingSpot = parkingSpot
+        self.streetID = streetID
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -83,6 +97,8 @@ class EditParkingSpotViewController: UIViewController {
         contentView.addSubview(typeSegmentControl)
         contentView.addSubview(availabilityLabel)
         contentView.addSubview(availabilitySwitch)
+        contentView.addSubview(latitudeField)
+        contentView.addSubview(longitudeField)
         contentView.addSubview(updateButton)
         
         NSLayoutConstraint.activate([
@@ -107,7 +123,16 @@ class EditParkingSpotViewController: UIViewController {
             availabilitySwitch.centerYAnchor.constraint(equalTo: availabilityLabel.centerYAnchor),
             availabilitySwitch.leadingAnchor.constraint(equalTo: availabilityLabel.trailingAnchor, constant: 20),
             
-            updateButton.topAnchor.constraint(equalTo: availabilityLabel.bottomAnchor, constant: 30),
+            latitudeField.topAnchor.constraint(equalTo: availabilityLabel.bottomAnchor, constant: 20),
+            latitudeField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            latitudeField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            
+            longitudeField.topAnchor.constraint(equalTo: latitudeField.bottomAnchor, constant: 16),
+            longitudeField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            longitudeField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            
+            // Update button constraints now connect to longitudeField instead of availabilityLabel
+            updateButton.topAnchor.constraint(equalTo: longitudeField.bottomAnchor, constant: 30),
             updateButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             updateButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             updateButton.heightAnchor.constraint(equalToConstant: 50),
@@ -128,20 +153,28 @@ class EditParkingSpotViewController: UIViewController {
         }
         
         availabilitySwitch.isOn = parkingSpot.isAvailable
+        latitudeField.textField.text = String(parkingSpot.latitude)
+        longitudeField.textField.text = String(parkingSpot.longitude)
     }
     
     @objc private func updateButtonTapped() {
+        // Validate coordinates
+        guard let latitudeText = latitudeField.textField.text,
+              let longitudeText = longitudeField.textField.text,
+              let latitude = Double(latitudeText),
+              let longitude = Double(longitudeText) else {
+            showAlert(title: "Error", message: "Please enter valid coordinates")
+            return
+        }
+        
         let types = ["green", "yellow", "red", "disable"]
         let type = types[typeSegmentControl.selectedSegmentIndex]
-        
+        let parkingInsert = ParkingInsertData(parkingSpotID: parkingSpot.parkingSpotID, streetID: streetID, latitude: latitude, longitude: longitude, type: type)
         Task {
             do {
                 try await supabase
                     .from("ParkingSpot")
-                    .update([
-                        "type": type,
-                        "isAvailable": availabilitySwitch.isOn
-                    ])
+                    .update(parkingInsert)
                     .eq("parkingSpotID", value: parkingSpot.parkingSpotID)
                     .execute()
                 

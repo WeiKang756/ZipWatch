@@ -4,19 +4,12 @@
 //
 //  Created by Wei Kang Tan on 15/01/2025.
 //
-
-
 import UIKit
-
-protocol AddParkingSpotViewControllerDelegate: AnyObject {
-    func didAddParkingSpot()
-}
 
 class AddParkingSpotViewController: UIViewController {
     // MARK: - Properties
     private let streetID: Int
-    private let supabase = SupabaseManager.shared.client
-    weak var delegate: AddParkingSpotViewControllerDelegate?
+    private var addParkingManager = AddParkingManager()
     
     // MARK: - UI Components
     private let scrollView: UIScrollView = {
@@ -69,6 +62,10 @@ class AddParkingSpotViewController: UIViewController {
         return view
     }()
     
+    private let latitudeField = FormFieldView(title: "LATITUDE", placeholder: "Enter latitude (e.g., 6.0161)")
+    private let longitudeField = FormFieldView(title: "LONGITUDE", placeholder: "Enter longitude (e.g., 116.1223)")
+    private let parkingSpotIDField = FormFieldView(title: "PARKING SPOT ID", placeholder: "Enter parking spot ID")
+    
     private let typeLabel: UILabel = {
         let label = UILabel()
         label.text = "PARKING TYPE"
@@ -114,6 +111,57 @@ class AddParkingSpotViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupActions()
+        setupKeyboardHandling()
+        addParkingManager.delegate = self
+    }
+    
+    // Add these methods to handle keyboard
+    private func setupKeyboardHandling() {
+        // Add tap gesture to dismiss keyboard
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        view.addGestureRecognizer(tap)
+        
+        // Add keyboard notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+        
+        // Set text field delegates
+        latitudeField.textField.delegate = self
+        longitudeField.textField.delegate = self
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+
+    @objc private func keyboardWillShow(notification: NSNotification) {
+        guard let keyboardSize = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
+        
+        let contentInsets = UIEdgeInsets(top: 0, left: 0, bottom: keyboardSize.height, right: 0)
+        scrollView.contentInset = contentInsets
+        scrollView.scrollIndicatorInsets = contentInsets
+        
+        // Scroll to active text field
+        if let activeField = [latitudeField.textField, longitudeField.textField].first(where: { $0.isFirstResponder }) {
+            let rect = activeField.convert(activeField.bounds, to: scrollView)
+            scrollView.scrollRectToVisible(rect.insetBy(dx: 0, dy: -20), animated: true)
+        }
+    }
+
+    @objc private func keyboardWillHide(notification: NSNotification) {
+        scrollView.contentInset = .zero
+        scrollView.scrollIndicatorInsets = .zero
     }
     
     // MARK: - Setup
@@ -130,7 +178,11 @@ class AddParkingSpotViewController: UIViewController {
         contentView.addSubview(formCard)
         formCard.addSubview(typeLabel)
         formCard.addSubview(typeSegmentControl)
+        formCard.addSubview(latitudeField)
+        formCard.addSubview(longitudeField)
         formCard.addSubview(addButton)
+        formCard.addSubview(parkingSpotIDField)
+        formCard.addSubview(typeLabel)
         
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -159,15 +211,26 @@ class AddParkingSpotViewController: UIViewController {
             formCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             formCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             formCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
-            
-            typeLabel.topAnchor.constraint(equalTo: formCard.topAnchor, constant: 20),
+            parkingSpotIDField.topAnchor.constraint(equalTo: formCard.topAnchor, constant: 20),
+            parkingSpotIDField.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
+            parkingSpotIDField.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
+
+            typeLabel.topAnchor.constraint(equalTo: parkingSpotIDField.bottomAnchor, constant: 20),
             typeLabel.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
             
             typeSegmentControl.topAnchor.constraint(equalTo: typeLabel.bottomAnchor, constant: 8),
             typeSegmentControl.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
             typeSegmentControl.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
             
-            addButton.topAnchor.constraint(equalTo: typeSegmentControl.bottomAnchor, constant: 30),
+            latitudeField.topAnchor.constraint(equalTo: typeSegmentControl.bottomAnchor, constant: 20),
+            latitudeField.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
+            latitudeField.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
+            
+            longitudeField.topAnchor.constraint(equalTo: latitudeField.bottomAnchor, constant: 16),
+            longitudeField.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
+            longitudeField.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
+            
+            addButton.topAnchor.constraint(equalTo: longitudeField.bottomAnchor, constant: 30),
             addButton.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 20),
             addButton.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -20),
             addButton.heightAnchor.constraint(equalToConstant: 50),
@@ -179,32 +242,69 @@ class AddParkingSpotViewController: UIViewController {
         addButton.addTarget(self, action: #selector(addButtonTapped), for: .touchUpInside)
     }
     
+    // Add this function to your class
+    private func validateFields() -> Bool {
+        var isValid = true
+        
+        // Validate parking spot ID
+        if parkingSpotIDField.textField.text?.isEmpty ?? true {
+            parkingSpotIDField.showError(true)
+            isValid = false
+        } else if Int(parkingSpotIDField.textField.text ?? "") == nil {
+            parkingSpotIDField.showError(true)
+            isValid = false
+        }
+        
+        // Validate coordinates
+        if latitudeField.textField.text?.isEmpty ?? true {
+            latitudeField.showError(true)
+            isValid = false
+        } else if Double(latitudeField.textField.text ?? "") == nil {
+            latitudeField.showError(true)
+            isValid = false
+        }
+        
+        if longitudeField.textField.text?.isEmpty ?? true {
+            longitudeField.showError(true)
+            isValid = false
+        } else if Double(longitudeField.textField.text ?? "") == nil {
+            longitudeField.showError(true)
+            isValid = false
+        }
+        
+        if !isValid {
+            showAlert(title: "Error", message: "Please enter valid values")
+        }
+        
+        return isValid
+    }
+    
     // MARK: - Actions
     @objc private func addButtonTapped() {
+        guard validateFields() else { return }
+        
         let types = ["green", "yellow", "red", "disable"]
         let selectedType = types[typeSegmentControl.selectedSegmentIndex]
         
-        Task {
-            do {
-                try await supabase
-                    .from("ParkingSpot")
-                    .insert([
-                        "type": selectedType,
-                        "isAvailable": true,
-                        "streetID": streetID
-                    ])
-                    .execute()
-                
-                DispatchQueue.main.async { [weak self] in
-                    self?.delegate?.didAddParkingSpot()
-                    self?.showSuccessAlert()
-                }
-            } catch {
-                DispatchQueue.main.async { [weak self] in
-                    self?.showAlert(title: "Error", message: error.localizedDescription)
-                }
-            }
+        guard let parkingSpotIDText = parkingSpotIDField.textField.text,
+              let parkingSpotID = Int(parkingSpotIDText),
+              let latitudeText = latitudeField.textField.text,
+              let longitudeText = longitudeField.textField.text,
+              let latitude = Double(latitudeText),
+              let longitude = Double(longitudeText) else {
+            showAlert(title: "Error", message: "Please enter valid values")
+            return
         }
+        
+        let parkingSpot = ParkingInsertData(
+            parkingSpotID: parkingSpotID,
+            streetID: streetID,
+            latitude: latitude,
+            longitude: longitude,
+            type: selectedType
+        )
+        
+        addParkingManager.addParkingSpot(parkingSpot: parkingSpot)
     }
     
     private func showAlert(title: String, message: String) {
@@ -225,3 +325,39 @@ class AddParkingSpotViewController: UIViewController {
         present(alert, animated: true)
     }
 }
+
+extension AddParkingSpotViewController: AddParkingManagerDelegate {
+    func didAddParkingSpot() {
+        DispatchQueue.main.async {
+            self.showSuccessAlert()
+        }
+    }
+    
+    func didFailAddParkingSpot() {
+        DispatchQueue.main.async {
+            self.showAlert(title: "Error", message: "Failed to add parking spot")
+        }
+    }
+}
+
+// Add UITextFieldDelegate extension
+extension AddParkingSpotViewController: UITextFieldDelegate {
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        if textField == latitudeField.textField {
+            latitudeField.hideError()
+        } else if textField == longitudeField.textField {
+            longitudeField.hideError()
+        }
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField == latitudeField.textField {
+            longitudeField.textField.becomeFirstResponder()
+        } else {
+            textField.resignFirstResponder()
+            addButtonTapped()
+        }
+        return true
+    }
+}
+

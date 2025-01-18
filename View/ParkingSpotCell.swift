@@ -1,3 +1,11 @@
+//
+//  ParkingSpotCell.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 15/01/2025.
+//
+
+import UIKit
 
 // MARK: - ParkingSpotCell
 class ParkingSpotCell: UITableViewCell {

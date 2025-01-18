@@ -6,12 +6,12 @@
 //
 
 struct ParkingSpotArray: Decodable{
-    let numGreen: Int
-    let numYellow: Int
-    let numRed: Int
-    let numDisable: Int
-    let totalParking: Int
-    let availableParking: Int
+    let numGreen: Int?
+    let numYellow: Int?
+    let numRed: Int?
+    let numDisable: Int?
+    let totalParking: Int?
+    let availableParking: Int?
     
     enum CodingKeys: String, CodingKey {
         case numGreen = "green"

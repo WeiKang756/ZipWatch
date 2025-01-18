@@ -1,3 +1,11 @@
+//
+//  ViolationCell.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import UIKit
+
 class ViolationCell: UITableViewCell {
     private let containerView: UIView = {
         let view = UIView()
