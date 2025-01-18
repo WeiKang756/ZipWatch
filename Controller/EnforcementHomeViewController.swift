@@ -1,17 +1,16 @@
 //
-//  OfficialHomeViewController.swift
+//  EnforcementHomeViewController.swift
 //  ZipWatch
 //
-//  Created by Wei Kang Tan on 03/01/2025.
+//  Created by Wei Kang Tan on 13/01/2025.
 //
 
 
 import UIKit
 
-class OfficialHomeViewController: UIViewController {
-
-    //MARK: - Properties
-    private var loginManger = LoginManager()
+class EnforcementHomeViewController: UIViewController {
+    // MARK: - Properties
+    private var loginManager = LoginManager()
     
     // MARK: - UI Components
     private let headerView: UIView = {
@@ -23,7 +22,7 @@ class OfficialHomeViewController: UIViewController {
     
     private let welcomeLabel: UILabel = {
         let label = UILabel()
-        label.text = "Welcome back, Admin"
+        label.text = "Welcome back, Officer"
         label.font = .systemFont(ofSize: 24, weight: .bold)
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -37,8 +36,6 @@ class OfficialHomeViewController: UIViewController {
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    
-
     
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
@@ -75,31 +72,26 @@ class OfficialHomeViewController: UIViewController {
     }()
     
     private let stats = [
-        StatItem(title: "Total Revenue", value: "RM 125,430", change: "+12.5%", isPositive: true),
-        StatItem(title: "Active Sessions", value: "1,234", change: "-3.2%", isPositive: false),
-        StatItem(title: "Violations", value: "85", change: "+5.8%", isPositive: false),
-        StatItem(title: "Occupancy Rate", value: "78%", change: "+2.1%", isPositive: true)
+        StatItem(title: "Active Sessions", value: "847", change: "+5.2%", isPositive: true),
+        StatItem(title: "Current Occupancy", value: "76%", change: "+3.8%", isPositive: true),
+        StatItem(title: "Pending Reports", value: "12", change: "-25%", isPositive: true),
+        StatItem(title: "Daily Violations", value: "28", change: "+12%", isPositive: false)
     ]
     
     private let actions = [
-        ActionItem(title: "Manage Users", description: "View and manage accounts", iconName: "person.fill"),
+        ActionItem(title: "Active Sessions", description: "View current parking sessions", iconName: "car.fill"),
         ActionItem(title: "View Reports", description: "Check violation reports", iconName: "doc.text.fill"),
-        ActionItem(title: "Parking Zones", description: "Manage parking areas", iconName: "map.fill"),
-        ActionItem(title: "Analytics", description: "View statistics", iconName: "chart.bar.fill")
+        ActionItem(title: "Parking Zones", description: "Monitor parking areas", iconName: "map.fill"),
+        ActionItem(title: "Compound", description: "View Compound", iconName: "chart.bar.fill")
     ]
 
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        loginManger.delegate = self
+        loginManager.delegate = self
         setupUI()
         setupCollectionViews()
         setupActions()
-    }
-    
-    //MARK: - Action
-    @objc func logoutButtonTapped() {
-        loginManger.signOut()
     }
     
     // MARK: - Setup
@@ -113,20 +105,17 @@ class OfficialHomeViewController: UIViewController {
         headerView.addSubview(welcomeLabel)
         headerView.addSubview(logoutButton)
         
-        // Add scroll view for content
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
         
-        // Add collection views to content view
         contentView.addSubview(statsCollectionView)
         contentView.addSubview(actionsCollectionView)
         
         NSLayoutConstraint.activate([
-            // Header
             headerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            headerView.heightAnchor.constraint(equalToConstant: 100), // Fixed height for header
+            headerView.heightAnchor.constraint(equalToConstant: 100),
             
             welcomeLabel.topAnchor.constraint(equalTo: headerView.topAnchor, constant: 24),
             welcomeLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 24),
@@ -135,8 +124,7 @@ class OfficialHomeViewController: UIViewController {
             logoutButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -24),
             logoutButton.widthAnchor.constraint(equalToConstant: 32),
             logoutButton.heightAnchor.constraint(equalToConstant: 32),
-                        
-            // Scroll View
+            
             scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -148,7 +136,6 @@ class OfficialHomeViewController: UIViewController {
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
-            // Collection Views
             statsCollectionView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
             statsCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             statsCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
@@ -160,30 +147,6 @@ class OfficialHomeViewController: UIViewController {
             actionsCollectionView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
             actionsCollectionView.heightAnchor.constraint(equalToConstant: 500)
         ])
-    }
-    
-    private func handleActionSelection(_ action: ActionItem) {
-        switch action.title {
-        case "Manage Users":
-            let cityOfficialVC = CreateOfficialAccountViewController()
-            navigationController?.pushViewController(cityOfficialVC, animated: true)
-            
-        case "View Reports":
-            let vc = ReportListViewController()
-            navigationController?.pushViewController(vc, animated: true)
-            
-        case "Parking Zones":
-            let vc = OfficialListViewController()
-            navigationController?.pushViewController(vc, animated: true)
-
-            
-        case "Analytics":
-            let vc = AreaListViewController()
-            navigationController?.pushViewController(vc, animated: true)
-            
-        default:
-            break
-        }
     }
     
     private func setupCollectionViews() {
@@ -199,19 +162,39 @@ class OfficialHomeViewController: UIViewController {
     private func setupActions() {
         logoutButton.addTarget(self, action: #selector(logoutButtonTapped), for: .touchUpInside)
     }
+    
+    @objc private func logoutButtonTapped() {
+        loginManager.signOut()
+    }
+    
+    private func handleActionSelection(_ action: ActionItem) {
+        switch action.title {
+        case "Active Sessions":
+            let vc = ActiveSessionsViewController()
+            navigationController?.pushViewController(vc, animated: true)
+            break
+            
+        case "View Reports":
+            let vc = ReportListViewController()
+            navigationController?.pushViewController(vc, animated: true)
+            
+        case "Parking Zones":
+            let vc = AreaListViewController()
+            navigationController?.pushViewController(vc, animated: true)
+            
+        case "Compound":
+            let vc = CompoundListViewController()
+            navigationController?.pushViewController(vc, animated: true)
+            break
+            
+        default:
+            break
+        }
+    }
 }
 
 // MARK: - UICollectionViewDelegate & DataSource
-extension OfficialHomeViewController: UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
-    
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
-        if collectionView == statsCollectionView {
-            return 16
-        } else {
-            return 16
-        }
-    }
-    
+extension EnforcementHomeViewController: UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return collectionView == statsCollectionView ? stats.count : actions.count
     }
@@ -232,7 +215,6 @@ extension OfficialHomeViewController: UICollectionViewDelegate, UICollectionView
         if collectionView == statsCollectionView {
             return CGSize(width: 200, height: 100)
         } else {
-            
             let width = view.bounds.width - 32
             return CGSize(width: width, height: 100)
         }
@@ -246,13 +228,13 @@ extension OfficialHomeViewController: UICollectionViewDelegate, UICollectionView
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
             
-            // Handle the action
             handleActionSelection(action)
         }
     }
 }
 
-extension OfficialHomeViewController: LoginManagerDelegate {
+// MARK: - LoginManagerDelegate
+extension EnforcementHomeViewController: LoginManagerDelegate {
     func didSignOut() {
         DispatchQueue.main.async {
             let loginVC = LoginViewController()
@@ -267,16 +249,14 @@ extension OfficialHomeViewController: LoginManagerDelegate {
             window.makeKeyAndVisible()
             
             UIView.transition(with: window,
-                             duration: 0.5,
-                             options: [.transitionCrossDissolve],
-                             animations: nil,
-                             completion: nil)
+                            duration: 0.5,
+                            options: [.transitionCrossDissolve],
+                            animations: nil,
+                            completion: nil)
         }
     }
 }
 
-
-
 #Preview {
-    OfficialHomeViewController()
+    EnforcementHomeViewController()
 }

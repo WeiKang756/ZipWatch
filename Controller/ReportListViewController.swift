@@ -63,17 +63,17 @@ class ReportListViewController: UIViewController {
         navigationItem.title = "Reports"
         navigationController?.navigationBar.prefersLargeTitles = true
         
-        if let navigationBar = navigationController?.navigationBar {
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .black
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-            
-            navigationBar.standardAppearance = appearance
-            navigationBar.scrollEdgeAppearance = appearance
-            navigationBar.compactAppearance = appearance
-        }
+//        if let navigationBar = navigationController?.navigationBar {
+//            let appearance = UINavigationBarAppearance()
+//            appearance.configureWithOpaqueBackground()
+//            appearance.backgroundColor = .black
+//            appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+//            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+//            
+//            navigationBar.standardAppearance = appearance
+//            navigationBar.scrollEdgeAppearance = appearance
+//            navigationBar.compactAppearance = appearance
+//        }
     }
     
     private func setupTableView() {
