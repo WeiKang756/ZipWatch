@@ -349,7 +349,9 @@ class CreateOfficialAccountViewController: UIViewController {
 
 extension CreateOfficialAccountViewController: AccountManagerDelegate {
     func didCreateAccount(_ officialData: OfficialAccount) {
-        self.showSuccessAlert()
+        DispatchQueue.main.async { [weak self] in
+            self?.showSuccessAlert()
+        }
     }
     
     func didFailCreateAccount(_ error: String) {

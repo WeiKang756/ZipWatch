@@ -1,12 +1,21 @@
+//
+//  EditAreaViewControllerDelegate.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import UIKit
+
 protocol EditAreaViewControllerDelegate: AnyObject {
     func didUpdateArea()
 }
 
-class EditAreaViewController: UIViewController {
+class EditAreaViewController: UIViewController{
     // MARK: - Properties
     private let area: AreaModel
     private let supabase = SupabaseManager.shared.client
     weak var delegate: EditAreaViewControllerDelegate?
+    private var activeTextField: UITextField?
     
     // MARK: - UI Components
     private let scrollView: UIScrollView = {
@@ -52,6 +61,7 @@ class EditAreaViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         configureWithArea()
+        setupKeyboardHandling()
     }
     
     // MARK: - Setup
@@ -118,14 +128,11 @@ class EditAreaViewController: UIViewController {
         }
         
         Task {
+            let areaInsertData = AreaInsertData(areaName: name, latitude: latitude, longitude: longitude)
             do {
                 try await supabase
                     .from("Area")
-                    .update([
-                        "areaName": name,
-                        "latitude": latitude,
-                        "longitude": longitude
-                    ])
+                    .update(areaInsertData)
                     .eq("areaID", value: area.areaID)
                     .execute()
                 
@@ -155,5 +162,84 @@ class EditAreaViewController: UIViewController {
             self?.navigationController?.popViewController(animated: true)
         })
         present(alert, animated: true)
+    }
+    
+    private func setupKeyboardHandling() {
+        // Add tap gesture to dismiss keyboard
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        view.addGestureRecognizer(tapGesture)
+        
+        // Register for keyboard notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+        
+        // Set delegates for textFields
+        [nameField, latitudeField, longitudeField].forEach {
+            $0.textField.delegate = self
+        }
+    }
+
+    // Add these methods to handle keyboard
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+
+    @objc private func keyboardWillShow(notification: NSNotification) {
+        guard let keyboardSize = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
+              let activeField = activeTextField else { return }
+        
+        let bottomOfTextField = activeField.convert(activeField.bounds, to: scrollView).maxY
+        let topOfKeyboard = scrollView.frame.height - keyboardSize.height
+        
+        // Calculate the distance between the bottom of text field and top of keyboard
+        let distanceToScroll = bottomOfTextField - topOfKeyboard + 20 // Add some padding
+        
+        if distanceToScroll > 0 {
+            scrollView.setContentOffset(CGPoint(x: 0, y: distanceToScroll), animated: true)
+        }
+    }
+
+    @objc private func keyboardWillHide(notification: NSNotification) {
+        scrollView.setContentOffset(.zero, animated: true)
+    }
+
+    // Add deinit to remove observers
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+}
+
+extension EditAreaViewController: UITextFieldDelegate {
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        activeTextField = textField
+    }
+    
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        activeTextField = nil
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        switch textField {
+        case nameField.textField:
+            latitudeField.textField.becomeFirstResponder()
+        case latitudeField.textField:
+            longitudeField.textField.becomeFirstResponder()
+        case longitudeField.textField:
+            textField.resignFirstResponder()
+            updateButtonTapped()
+        default:
+            textField.resignFirstResponder()
+        }
+        return true
     }
 }

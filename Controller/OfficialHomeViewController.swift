@@ -5,7 +5,6 @@
 //  Created by Wei Kang Tan on 03/01/2025.
 //
 
-
 import UIKit
 
 class OfficialHomeViewController: UIViewController {
@@ -37,9 +36,7 @@ class OfficialHomeViewController: UIViewController {
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    
 
-    
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
@@ -53,17 +50,6 @@ class OfficialHomeViewController: UIViewController {
         return view
     }()
     
-    private let statsCollectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.minimumInteritemSpacing = 16
-        layout.minimumLineSpacing = 16
-        let collection = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collection.backgroundColor = .clear
-        collection.translatesAutoresizingMaskIntoConstraints = false
-        return collection
-    }()
-    
     private let actionsCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.minimumInteritemSpacing = 16
@@ -74,18 +60,13 @@ class OfficialHomeViewController: UIViewController {
         return collection
     }()
     
-    private let stats = [
-        StatItem(title: "Total Revenue", value: "RM 125,430", change: "+12.5%", isPositive: true),
-        StatItem(title: "Active Sessions", value: "1,234", change: "-3.2%", isPositive: false),
-        StatItem(title: "Violations", value: "85", change: "+5.8%", isPositive: false),
-        StatItem(title: "Occupancy Rate", value: "78%", change: "+2.1%", isPositive: true)
-    ]
-    
     private let actions = [
         ActionItem(title: "Manage Users", description: "View and manage accounts", iconName: "person.fill"),
         ActionItem(title: "View Reports", description: "Check violation reports", iconName: "doc.text.fill"),
         ActionItem(title: "Parking Zones", description: "Manage parking areas", iconName: "map.fill"),
-        ActionItem(title: "Analytics", description: "View statistics", iconName: "chart.bar.fill")
+        ActionItem(title: "Analytics", description: "View statistics", iconName: "chart.bar.fill"),
+        ActionItem(title: "Transactions", description: "View payment history", iconName: "list.bullet.rectangle.fill"),
+        ActionItem(title: "Violation", description: "", iconName: "list.bullet.rectangle.fill")
     ]
 
     // MARK: - Lifecycle
@@ -117,8 +98,7 @@ class OfficialHomeViewController: UIViewController {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
         
-        // Add collection views to content view
-        contentView.addSubview(statsCollectionView)
+        // Add actions collection view to content view
         contentView.addSubview(actionsCollectionView)
         
         NSLayoutConstraint.activate([
@@ -148,13 +128,8 @@ class OfficialHomeViewController: UIViewController {
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
-            // Collection Views
-            statsCollectionView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
-            statsCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            statsCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            statsCollectionView.heightAnchor.constraint(equalToConstant: 130),
-            
-            actionsCollectionView.topAnchor.constraint(equalTo: statsCollectionView.bottomAnchor, constant: 24),
+            // Actions Collection View
+            actionsCollectionView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
             actionsCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             actionsCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             actionsCollectionView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
@@ -164,6 +139,10 @@ class OfficialHomeViewController: UIViewController {
     
     private func handleActionSelection(_ action: ActionItem) {
         switch action.title {
+        case "Transactions":
+            let transactionListVC = TransactionListViewController()
+            navigationController?.pushViewController(transactionListVC, animated: true)
+            
         case "Manage Users":
             let cityOfficialVC = CreateOfficialAccountViewController()
             navigationController?.pushViewController(cityOfficialVC, animated: true)
@@ -181,17 +160,17 @@ class OfficialHomeViewController: UIViewController {
             let vc = AreaListViewController()
             navigationController?.pushViewController(vc, animated: true)
             
+        case "Violation":
+            let violationsVC = ViolationListViewController()
+            navigationController?.pushViewController(violationsVC, animated: true)
+            
         default:
             break
         }
     }
     
     private func setupCollectionViews() {
-        statsCollectionView.register(StatCell.self, forCellWithReuseIdentifier: StatCell.identifier)
         actionsCollectionView.register(ActionCell.self, forCellWithReuseIdentifier: ActionCell.identifier)
-        
-        statsCollectionView.delegate = self
-        statsCollectionView.dataSource = self
         actionsCollectionView.delegate = self
         actionsCollectionView.dataSource = self
     }
@@ -205,50 +184,33 @@ class OfficialHomeViewController: UIViewController {
 extension OfficialHomeViewController: UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
-        if collectionView == statsCollectionView {
-            return 16
-        } else {
-            return 16
-        }
+        return 16
     }
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return collectionView == statsCollectionView ? stats.count : actions.count
+        return actions.count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        if collectionView == statsCollectionView {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: StatCell.identifier, for: indexPath) as! StatCell
-            cell.configure(with: stats[indexPath.item])
-            return cell
-        } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ActionCell.identifier, for: indexPath) as! ActionCell
-            cell.configure(with: actions[indexPath.item])
-            return cell
-        }
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ActionCell.identifier, for: indexPath) as! ActionCell
+        cell.configure(with: actions[indexPath.item])
+        return cell
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        if collectionView == statsCollectionView {
-            return CGSize(width: 200, height: 100)
-        } else {
-            
-            let width = view.bounds.width - 32
-            return CGSize(width: width, height: 100)
-        }
+        let width = view.bounds.width - 32
+        return CGSize(width: width, height: 100)
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        if collectionView == actionsCollectionView {
-            let action = actions[indexPath.item]
-            
-            // Add haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-            
-            // Handle the action
-            handleActionSelection(action)
-        }
+        let action = actions[indexPath.item]
+        
+        // Add haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        
+        // Handle the action
+        handleActionSelection(action)
     }
 }
 
@@ -273,10 +235,4 @@ extension OfficialHomeViewController: LoginManagerDelegate {
                              completion: nil)
         }
     }
-}
-
-
-
-#Preview {
-    OfficialHomeViewController()
 }

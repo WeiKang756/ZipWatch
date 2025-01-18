@@ -52,20 +52,45 @@ class SupabaseManager {
     
     // MARK: - Public Methods
     func getUser() async -> User?  {
-           do {
-               let session = try await client.auth.session
-               let user = session.user
-               return user
-           }catch {
-               print("fail to get session")
-               return nil
-           }
-       }
+        do {
+            let session = try await client.auth.session
+            let user = session.user
+            return user
+        }catch {
+            print("fail to get session")
+            return nil
+        }
+    }
+    
+    func getCurrentUserRole() async throws -> String? {
+        do {
+            // Get the currently logged-in user
+            guard let user = await getUser() else {
+                print("No logged-in user found")
+                return nil
+            }
+            
+            // Fetch the user's role using their ID
+            let userRole: UserRole = try await client
+                .from("officials")
+                .select("type")
+                .eq("id", value: user.id)
+                .single()
+                .execute()
+                .value
+            
+            return userRole.type
+        } catch {
+            print("Error fetching user role: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
     
     func getCurrentSession() async throws -> Session {
         return try await client.auth.session
     }
-
+    
     func signOut() {
         Task{
             do{
@@ -75,4 +100,8 @@ class SupabaseManager {
             }
         }
     }
+}
+
+struct UserRole: Codable{
+    let type: String
 }

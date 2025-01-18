@@ -1,3 +1,11 @@
+//
+//  SessionDetailViewController.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+
+
 import UIKit
 
 class SessionDetailViewController: UIViewController {
@@ -274,7 +282,7 @@ class SessionDetailViewController: UIViewController {
         areaLabel.text = "Area: \(session.parkingSpot.street.area.areaName)"
         
         startTimeLabel.text = "Start Time: \(DateFormatterUtility.shared.formatTime(session.startTime))"
-        endTimeLabel.text = "End Time: \(DateFormatterUtility.shared.formatTime(session.endTime))"
+        endTimeLabel.text = "End Time: \(DateFormatterUtility.shared.formatDate(session.endTime, to: .time))"
         durationLabel.text = "Duration: \(session.duration)"
         costLabel.text = String(format: "Cost: RM %.2f", session.totalCost)
     }

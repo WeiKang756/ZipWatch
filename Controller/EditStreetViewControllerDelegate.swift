@@ -1,3 +1,11 @@
+//
+//  EditStreetViewControllerDelegate.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import UIKit
+
 protocol EditStreetViewControllerDelegate: AnyObject {
     func didUpdateStreet()
 }
@@ -159,7 +167,7 @@ class EditStreetViewController: UIViewController {
     }
     
     private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferedStyle: .alert)
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
@@ -168,7 +176,7 @@ class EditStreetViewController: UIViewController {
         let alert = UIAlertController(
             title: "Success",
             message: "Street updated successfully",
-            preferedStyle: .alert
+            preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
             self?.navigationController?.popViewController(animated: true)

@@ -10,5 +10,5 @@ struct AccountDetail {
     let email: String
     let password: String
     let officialId: String
-    let role: String
+    let role: String?
 }

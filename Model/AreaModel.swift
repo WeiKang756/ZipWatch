@@ -14,19 +14,12 @@ struct AreaModel {
     let areaName: String
     let latitude: Double
     let longtitude: Double
-    let totalParking: Int
-    let availableParking: Int
-    let numGreen: Int
-    let numYellow: Int
-    let numRed: Int
-    let numDisable: Int
-
-    var availableParkingString: String {
-        return String(availableParking)
-    }
-    var totalParkingString: String {
-        return String(totalParking)
-    }
+    let totalParking: Int?
+    let availableParking: Int?
+    let numGreen: Int?
+    let numYellow: Int?
+    let numRed: Int?
+    let numDisable: Int?
     var distance: Double?
 
 }

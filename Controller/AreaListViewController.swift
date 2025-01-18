@@ -30,6 +30,7 @@ class AreaListViewController: UIViewController {
     private var areas: [AreaModel] = []
     private var filteredAreas: [AreaModel] = []
     private var parkingManager = ParkingManager()
+    private var userRole: String?
     
     private var isSearching: Bool {
         return searchController.isActive && !searchBarIsEmpty
@@ -47,6 +48,7 @@ class AreaListViewController: UIViewController {
         setupSearchController()
         setupMapManager()
         fetchAreas()
+        fetchUserRoleAndData()
     }
     
     // MARK: - Setup
@@ -54,6 +56,13 @@ class AreaListViewController: UIViewController {
         view.backgroundColor = .systemBackground
         title = "Parking Areas"
         navigationController?.navigationBar.prefersLargeTitles = true
+        let addButton = UIBarButtonItem(
+            image: UIImage(systemName: "plus"),
+            style: .plain,
+            target: self,
+            action: #selector(addButtonTapped)
+        )
+        navigationItem.rightBarButtonItem = addButton
         
         view.addSubview(tableView)
         view.addSubview(loadingIndicator)
@@ -88,9 +97,38 @@ class AreaListViewController: UIViewController {
     }
     
     // MARK: - Data Fetching
+    private func fetchUserRoleAndData() {
+            loadingIndicator.startAnimating()
+            
+            Task {
+                do {
+                    // Fetch user role
+                    userRole = try await SupabaseManager.shared.getCurrentUserRole()
+                    print("User role: \(userRole ?? "Unknown")")
+                    
+                    // Fetch areas after determining the role
+                    fetchAreas()
+                    
+                    // Configure UI based on user role
+                    DispatchQueue.main.async {
+                        self.configureRoleBasedUI()
+                    }
+                } catch {
+                    print("Error fetching user role: \(error.localizedDescription)")
+                }
+            }
+        }
+        
     private func fetchAreas() {
         loadingIndicator.startAnimating()
         parkingManager.fetchAreaData()
+    }
+    
+    private func configureRoleBasedUI() {
+        // Disable "Add" button for non-city-official users
+        if userRole != "city_official" {
+            navigationItem.rightBarButtonItem?.isEnabled = false
+        }
     }
     
     private func filterContentForSearchText(_ searchText: String) {
@@ -98,6 +136,51 @@ class AreaListViewController: UIViewController {
             return area.areaName.lowercased().contains(searchText.lowercased())
         }
         tableView.reloadData()
+    }
+    
+    private func showDeleteConfirmation(for area: AreaModel) {
+        guard userRole == "city_official" else {
+            showAlert(title: "Permission Denied", message: "Only city officials can delete areas.")
+            return
+        }
+        
+        let alert = UIAlertController(
+            title: "Delete Area",
+            message: "Are you sure you want to delete \(area.areaName)?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.deleteArea(area)
+        })
+        
+        present(alert, animated: true)
+    }
+
+    private func deleteArea(_ area: AreaModel) {
+        Task {
+            do {
+                try await SupabaseManager.shared.client
+                    .from("Area")
+                    .delete()
+                    .eq("areaID", value: area.areaID)
+                    .execute()
+                
+                // Refresh the data
+                fetchAreas()
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.showAlert(title: "Error", message: "Failed to delete area: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 }
 
@@ -134,6 +217,33 @@ extension AreaListViewController: UITableViewDelegate, UITableViewDataSource {
         let streetListVC = StreetListViewController(areaID: area.areaID)
         navigationController?.pushViewController(streetListVC, animated: true)
         tableView.deselectRow(at: indexPath, animated: true)
+    }
+    
+    func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let area = isSearching ? filteredAreas[indexPath.row] : areas[indexPath.row]
+        
+        // Edit action
+        let editAction = UIContextualAction(style: .normal, title: "Edit") { [weak self] (action, view, completion) in
+            guard self?.userRole == "city_official" else {
+                self?.showAlert(title: "Permission Denied", message: "Only city officials can edit areas.")
+                completion(false)
+                return
+            }
+            
+            let editAreaVC = EditAreaViewController(area: area)
+            editAreaVC.delegate = self
+            self?.navigationController?.pushViewController(editAreaVC, animated: true)
+            completion(true)
+        }
+        editAction.backgroundColor = .systemBlue
+        
+        // Delete action
+        let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] (action, view, completion) in
+            self?.showDeleteConfirmation(for: area)
+            completion(true)
+        }
+        
+        return UISwipeActionsConfiguration(actions: [deleteAction, editAction])
     }
 }
 
@@ -299,21 +409,39 @@ class AreaCell: UITableViewCell {
     func configure(with area: AreaModel) {
         areaNameLabel.text = area.areaName
         
-        availableLabel.text = "\(area.availableParking) Available"
-        totalLabel.text = "Total: \(area.totalParking)"
+        availableLabel.text = "\(area.availableParking ?? 0) Available"
+        totalLabel.text = "Total: \(area.totalParking ?? 0)"
         
         // Update parking type counts
         if let greenLabel = parkingTypesStackView.arrangedSubviews[0].viewWithTag("Green".hashValue) as? UILabel {
-            greenLabel.text = "\(area.numGreen)"
+            greenLabel.text = "\(area.numGreen ?? 0)"
         }
         if let yellowLabel = parkingTypesStackView.arrangedSubviews[1].viewWithTag("Yellow".hashValue) as? UILabel {
-            yellowLabel.text = "\(area.numYellow)"
+            yellowLabel.text = "\(area.numYellow ?? 0)"
         }
         if let redLabel = parkingTypesStackView.arrangedSubviews[2].viewWithTag("Red".hashValue) as? UILabel {
-            redLabel.text = "\(area.numRed)"
+            redLabel.text = "\(area.numRed ?? 0)"
         }
         if let disableLabel = parkingTypesStackView.arrangedSubviews[3].viewWithTag("Disable".hashValue) as? UILabel {
-            disableLabel.text = "\(area.numDisable)"
+            disableLabel.text = "\(area.numDisable ?? 0)"
         }
+    }
+}
+
+extension AreaListViewController {
+    @objc private func addButtonTapped() {
+        guard userRole == "city_official" else {
+            showAlert(title: "Permission Denied", message: "Only city officials can add areas.")
+            return
+        }
+        
+        let addAreaVC = AddAreaViewController()
+        navigationController?.pushViewController(addAreaVC, animated: true)
+    }
+}
+
+extension AreaListViewController: EditAreaViewControllerDelegate {
+    func didUpdateArea() {
+        fetchAreas()
     }
 }

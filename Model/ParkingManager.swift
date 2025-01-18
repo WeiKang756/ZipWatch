@@ -60,22 +60,19 @@ struct ParkingManager {
                 for areaData in areasData {
                     let areaLocation = CLLocation(latitude: areaData.latitude, longitude: areaData.longitude)
                     
-                    guard let parkingSpotArray = await fetchParkingSpotArray(areaID: areaData.areaID) else {
-                        print("Error: Unable to fetch parking data for area \(areaData.areaID)")
-                        continue
-                    }
+                    let parkingSpotArray = await fetchParkingSpotArray(areaID: areaData.areaID)
                     
                     let areaModel = AreaModel(
                         areaID: areaData.areaID,
                         areaName: areaData.areaName,
                         latitude: areaData.latitude,
                         longtitude: areaData.longitude,
-                        totalParking: parkingSpotArray.totalParking,
-                        availableParking: parkingSpotArray.availableParking,
-                        numGreen: parkingSpotArray.numGreen,
-                        numYellow: parkingSpotArray.numYellow,
-                        numRed: parkingSpotArray.numRed,
-                        numDisable: parkingSpotArray.numDisable,
+                        totalParking: parkingSpotArray?.totalParking,
+                        availableParking: parkingSpotArray?.availableParking,
+                        numGreen: parkingSpotArray?.numGreen,
+                        numYellow: parkingSpotArray?.numYellow,
+                        numRed: parkingSpotArray?.numRed,
+                        numDisable: parkingSpotArray?.numDisable,
                         distance: nil
                     )
                     
@@ -140,20 +137,17 @@ struct ParkingManager {
                         parkingSpotModels.append(parkingSpotModel)
                     }
                     
-                    guard let streetInfoData = await fetchStreetInfo(streetID: streetID) else {
-                        print("Error: Unable to fetch street info for street \(streetID)")
-                        continue
-                    }
+                   let streetInfoData = await fetchStreetInfo(streetID: streetID)
                     
                     let streetModel = StreetModel(
                         streetID: streetData.streetID,
                         streetName: streetData.streetName,
                         areaID: streetData.areaID,
-                        numGreen: streetInfoData.numGreen,
-                        numRed: streetInfoData.numRed,
-                        numYellow: streetInfoData.numYellow,
-                        numDisable: streetInfoData.numDisable,
-                        numAvailable: streetInfoData.numAvailable,
+                        numGreen: streetInfoData?.numGreen ?? 0,
+                        numRed: streetInfoData?.numRed ?? 0,
+                        numYellow: streetInfoData?.numYellow ?? 0,
+                        numDisable: streetInfoData?.numDisable ?? 0,
+                        numAvailable: streetInfoData?.numAvailable ?? 0,
                         parkingSpots: parkingSpotModels
                     )
                     
@@ -163,6 +157,7 @@ struct ParkingManager {
                 if !streetsModel.isEmpty {
                     delegate?.didFetchStreetAndParkingSpotData(streetsModel)
                 } else {
+                    delegate?.didFetchStreetAndParkingSpotData(streetsModel)
                     print("No street data available")
                 }
                 

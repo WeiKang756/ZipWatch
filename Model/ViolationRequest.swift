@@ -1,3 +1,11 @@
+//
+//  ViolationRequest.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 16/01/2025.
+//
+import Foundation
+
 struct ViolationRequest: Codable {
     let violationCode: String
     let section: String
@@ -17,4 +25,4 @@ struct ViolationRequest: Codable {
         case amount30Days = "amount_30_days"
         case amount60Days = "amount_60_days"
     }
-    
+}

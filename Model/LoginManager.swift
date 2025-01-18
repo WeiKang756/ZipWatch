@@ -8,12 +8,12 @@ import Supabase
 import Foundation
 
 protocol LoginManagerDelegate {
-    func didSignIn(_ result: Bool, _ description: String)
+    func didSignIn(_ result: Bool, _ description: String, _ role: String?)
     func didSignOut()
 }
 
 extension LoginManagerDelegate {
-    func didSignIn(_ result: Bool, _ description: String){
+    func didSignIn(_ result: Bool, _ description: String, _ role: String?){
         print("Did Sign In")
     }
     
@@ -26,26 +26,32 @@ struct LoginManager {
     let supabase = SupabaseManager.shared.client
     var delegate: LoginManagerDelegate?
     
+    
     func signIn(email: String, password: String) {
         Task {
             do {
-
                 let authResponse = try await supabase.auth.signIn(
                     email: email,
                     password: password
                 )
                 
-                let isOfficial = try await checkIfOfficial(officialId: authResponse.user.id)
+                // Fetch user's role from officials table
+                let response: [Official] = try await supabase
+                    .from("officials")
+                    .select()
+                    .eq("id", value: authResponse.user.id)
+                    .execute()
+                    .value
                 
-                if isOfficial {
-                    delegate?.didSignIn(true, "Login successful")
+                if let official = response.first {
+                    delegate?.didSignIn(true, "Login successful", official.type)
                 } else {
                     try await supabase.auth.signOut()
-                    delegate?.didSignIn(false, "Unauthorized access. Only officials can login.")
+                    delegate?.didSignIn(false, "User not found", nil)
                 }
                 
             } catch {
-                delegate?.didSignIn(false, error.localizedDescription)
+                delegate?.didSignIn(false, error.localizedDescription, nil)
             }
         }
     }

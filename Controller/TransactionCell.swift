@@ -1,3 +1,12 @@
+//
+//  TransactionCell.swift
+//  ZipWatch
+//
+//  Created by Wei Kang Tan on 14/01/2025.
+//
+
+import UIKit
+
 class TransactionCell: UITableViewCell {
     // MARK: - UI Components
     private let containerView: UIView = {
